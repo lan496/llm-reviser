@@ -6,7 +6,13 @@ from langchain.chains import ConversationChain
 from langchain.chat_models import ChatOpenAI
 from langchain.memory import ConversationBufferMemory
 from langchain.schema import HumanMessage
+from langchain.prompts import ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate, MessagesPlaceholder
 
+
+ENGLISH_REVISER_PROMPT = """You are a helpful assistant for correcting English spelling and improving sentences.
+Replace immature words and sentences with more beautiful and elegant ones.
+Keep the same meaning, but make it more literary.
+"""
 
 @st.cache_resource
 def load_chain():
@@ -17,15 +23,29 @@ def load_chain():
         max_tokens=1024,
         temperature=0,
     )
+
+    chat_prompt = ChatPromptTemplate.from_messages([
+        SystemMessagePromptTemplate.from_template(ENGLISH_REVISER_PROMPT),
+        HumanMessagePromptTemplate.from_template("{input}"),
+        MessagesPlaceholder(variable_name="history"),
+    ])
+
     chain = ConversationChain(
         llm=llm,
-        memory=ConversationBufferMemory(),
+        prompt=chat_prompt,
+        # Somehow, return_messages=True is required...
+        # Ref: https://github.com/hwchase17/langchain/issues/1971
+        memory=ConversationBufferMemory(return_messages=True),
+        verbose=True,
     )
     return chain
 
 # From here down is all the StreamLit UI.
-st.set_page_config(page_title="LangChain Demo", page_icon=":robot:")
-st.header("LangChain Demo")
+st.set_page_config(page_title="ChatGPT for Poor Man", page_icon=":robot:")
+st.header("ChatGPT for Poor Man")
+
+# Show prompt
+st.info(f"Prompt: {ENGLISH_REVISER_PROMPT}")
 
 # Initialize or reload Chain
 if "chain" not in st.session_state:
@@ -36,8 +56,9 @@ with st.form("chat-form", clear_on_submit=True):
     user_input = st.text_area("Send a message...")
     submitted = st.form_submit_button()
 
-    if submitted:
-        st.session_state.chain.run(input=user_input)
+    if submitted and (user_input != ""):
+        with st.spinner("Wait for AI..."):
+            st.session_state.chain.predict(input=user_input)
 
 # Display chat history
 try:
