@@ -3,43 +3,49 @@ import streamlit as st
 from streamlit_chat import message
 
 from langchain.chains import ConversationChain
-from langchain.llms import OpenAI
+from langchain.chat_models import ChatOpenAI
+from langchain.memory import ConversationBufferMemory
+from langchain.schema import HumanMessage
 
 
+@st.cache_resource
 def load_chain():
     """Logic for loading the chain you want to use should go here."""
-    llm = OpenAI(temperature=0)
-    chain = ConversationChain(llm=llm)
+    llm = ChatOpenAI(
+        model_name='gpt-3.5-turbo',
+        # openai_api_key=None,
+        max_tokens=1024,
+        temperature=0,
+    )
+    chain = ConversationChain(
+        llm=llm,
+        memory=ConversationBufferMemory(),
+    )
     return chain
-
-chain = load_chain()
 
 # From here down is all the StreamLit UI.
 st.set_page_config(page_title="LangChain Demo", page_icon=":robot:")
 st.header("LangChain Demo")
 
-if "generated" not in st.session_state:
-    st.session_state["generated"] = []
+# Initialize or reload Chain
+if "chain" not in st.session_state:
+    chain = load_chain()
+    st.session_state['chain'] = chain
 
-if "past" not in st.session_state:
-    st.session_state["past"] = []
+with st.form("chat-form", clear_on_submit=True):
+    user_input = st.text_area("Send a message...")
+    submitted = st.form_submit_button()
 
+    if submitted:
+        st.session_state.chain.run(input=user_input)
 
-def get_text():
-    input_text = st.text_input("You: ", "Hello, how are you?", key="input")
-    return input_text
-
-
-user_input = get_text()
-
-if user_input:
-    output = chain.run(input=user_input)
-
-    st.session_state.past.append(user_input)
-    st.session_state.generated.append(output)
-
-if st.session_state["generated"]:
-
-    for i in range(len(st.session_state["generated"]) - 1, -1, -1):
-        message(st.session_state["generated"][i], key=str(i))
-        message(st.session_state["past"][i], is_user=True, key=str(i) + "_user")
+# Display chat history
+try:
+    messages = st.session_state.chain.memory.chat_memory.messages
+    for i, msg in list(enumerate(messages))[::-1]:
+        if isinstance(msg, HumanMessage):
+            message(msg.content, is_user=True, key=f"{i}_user", avatar_style="thumbs")
+        else:
+            message(msg.content, key=f"{i}")
+except KeyError:
+    pass
