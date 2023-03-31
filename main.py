@@ -1,7 +1,9 @@
-"""Python file to serve as the frontend"""
+import os
+
 import streamlit as st
 from streamlit_chat import message
 import pyperclip
+from openai.error import AuthenticationError
 
 from langchain.chains import ConversationChain
 from langchain.chat_models import ChatOpenAI
@@ -15,13 +17,13 @@ Replace immature words and sentences with more beautiful and elegant ones.
 Keep the same meaning, but make it more literary.
 """
 
+
 @st.cache_resource
-def load_chain():
+def load_chain(openai_api_key: str):
     """Logic for loading the chain you want to use should go here."""
     llm = ChatOpenAI(
         model_name='gpt-3.5-turbo',
-        # openai_api_key=None,
-        max_tokens=4096,
+        openai_api_key=openai_api_key,
         temperature=0,
     )
 
@@ -44,15 +46,31 @@ def load_chain():
 
 def main():
     # From here down is all the StreamLit UI.
-    st.set_page_config(page_title="ChatGPT for Poor Man", page_icon=":robot:")
-    st.header("ChatGPT for Poor Man")
+    title = "English Reviser for Poor Man"
+    st.set_page_config(page_title=title, page_icon=":robot:")
+    st.header(title)
+
+    # API key
+    openai_api_key = os.getenv("OPENAI_API_KEY")
+    if openai_api_key is None:
+        if "openai_api_key" not in st.session_state:
+            with st.form("api-key-form", clear_on_submit=True):
+                openai_api_key = st.text_area('Your OpenAI API key')
+                submitted = st.form_submit_button('Save')
+                if submitted and (openai_api_key != ""):
+                    st.session_state['openai_api_key'] = openai_api_key
+                    st.experimental_rerun()
+                else:
+                    return  # Reload page
+        else:
+            openai_api_key = st.session_state.openai_api_key
 
     # Show prompt
     st.info(f"Prompt: {ENGLISH_REVISER_PROMPT}")
 
     # Initialize or reload Chain
     if "chain" not in st.session_state:
-        chain = load_chain()
+        chain = load_chain(openai_api_key)
         st.session_state['chain'] = chain
 
     # Prepare input
@@ -62,7 +80,12 @@ def main():
 
         if submitted and (user_input != ""):
             with st.spinner("Wait for AI..."):
-                st.session_state.chain.predict(input=user_input)
+                try:
+                    st.session_state.chain.predict(input=user_input)
+                except AuthenticationError:
+                    st.error("Failed to authenticate OpenAI API key. Please reload page and specify a correct API key.")
+                    st.session_state.pop('openai_api_key')
+                    st.experimental_rerun()
 
     # Display chat history
     try:
