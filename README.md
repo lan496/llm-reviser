@@ -1,14 +1,9 @@
-# LangChain-Streamlit Template
+# English Reviser for Poor Man
 
-This repo serves as a template for how to deploy a LangChain on Streamlit.
+Revise given sentences with `gpt-3.5-turbo`
 
-This repo contains an `main.py` file which has a template for a chatbot implementation.
-
-## Adding your chain
-To add your chain, you need to change the `load_chain` function in `main.py`.
-Depending on the type of your chain, you may also need to change the inputs/outputs that occur later on.
-
-## Deploy on Streamlit
-
-This is easily deployable on the Streamlit platform.
-Note that when setting up your StreamLit app you should make sure to add `OPENAI_API_KEY` as a secret environment variable.
+```shell
+# export OPENAI_API_KEY="your_openai_api_key"
+pip install -r requirements.txt
+python -m streamlit run main.py
+```
